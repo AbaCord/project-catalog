@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = { version = "0.14.0", features = ["hot", "image"] }
+dirs = "6.0.0"
+iced = { version = "0.14.0", features = ["hot", "image", "tokio"] }
+process-wrap = { version = "9.1.0", features = ["std"] }
+tokio = { version = "1.52.0", features = ["full"] }

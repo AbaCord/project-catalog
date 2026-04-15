@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: project-catalog-linux
+            bin: project-catalog
+
+          - os: macos-latest
+            name: project-catalog-macos
+            bin: project-catalog
+
+          - os: windows-latest
+            name: project-catalog-windows
+            bin: project-catalog.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          mkdir dist
+          cp target/release/${{ matrix.bin }} dist/${{ matrix.name }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

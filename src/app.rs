@@ -1,4 +1,4 @@
-use std::{str::Bytes, time::Duration};
+use std::time::Duration;
 
 use iced::{
     Border, Color, ContentFit, Element, Length, Padding, Subscription, Task,
@@ -57,14 +57,28 @@ impl App {
         };
         Self {
             search: String::new(),
-            projects: vec![make(
-                "Pokemon battle simulator",
-                "Nikolai Ciric",
-                "https://github.com/nikcir/Java-Pokemon-battle-simulator",
-                include_bytes!(
-                    "../assets/previews/pokemon-battle-simulator.png"
+            projects: vec![
+                make(
+                    "Pokemon battle simulator",
+                    "Nikolai Ciric",
+                    "https://github.com/nikcir/Java-Pokemon-battle-simulator",
+                    include_bytes!(
+                        "../assets/previews/pokemon-battle-simulator.png"
+                    ),
                 ),
-            )],
+                make(
+                    "PacMan",
+                    "Kristoffer Nergaard",
+                    "https://github.com/Superkriss0911/PacMan",
+                    include_bytes!("../assets/previews/pacman.png"),
+                ),
+                make(
+                    "Piano Quiz",
+                    "Sven Elden",
+                    "https://github.com/Svela002/Piano-Quiz",
+                    include_bytes!("../assets/previews/piano-quiz.png"),
+                ),
+            ],
         }
     }
 

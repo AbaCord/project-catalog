@@ -10,7 +10,7 @@ use iced::{
     Border, Color, ContentFit, Element, Length, Padding, Subscription, Task,
     Theme, time,
     widget::{
-        Row, button, column, container, image, row, scrollable, text,
+        Grid, Row, button, column, container, image, row, scrollable, text,
         text_input,
     },
 };
@@ -31,11 +31,12 @@ fn theme(_state: &State) -> Theme {
     Theme::CatppuccinMocha
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum ProjectStatus {
     Idle,
     Installing,
     Running,
+    Uninstalling,
 }
 
 struct Project {
@@ -124,13 +125,22 @@ fn get_cache_dir() -> PathBuf {
         .join("project-catalog")
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum SyncAction {
+    Launch,
+    Ignore,
+}
+
 #[derive(Clone, Debug)]
 enum Message {
     SearchChanged(String),
     LaunchRequested(usize),
-    ProjectSynced(usize),
+    ProjectSynced(usize, SyncAction),
     StopProject(usize),
     Tick,
+    InstallProject(usize),
+    UninstallProject(usize),
+    ProjectUninstalled(usize),
 }
 
 fn update(state: &mut State, message: Message) -> Task<Message> {
@@ -147,15 +157,20 @@ fn update(state: &mut State, message: Message) -> Task<Message> {
                             project.id.clone(),
                             project.repo.clone(),
                         ),
-                        move |_| Message::ProjectSynced(i),
+                        move |_| Message::ProjectSynced(i, SyncAction::Launch),
                     );
                 }
             }
         }
-        Message::ProjectSynced(i) => {
+        Message::ProjectSynced(i, action) => {
             if let Some(mut project) = state.projects.get_mut(i) {
                 project.is_installed = true;
-                launch_project(&mut project);
+
+                if action == SyncAction::Launch {
+                    launch_project(&mut project);
+                } else {
+                    project.status = ProjectStatus::Idle;
+                }
             }
         }
         Message::StopProject(i) => {
@@ -175,6 +190,36 @@ fn update(state: &mut State, message: Message) -> Task<Message> {
                         project.status = ProjectStatus::Idle;
                     }
                 }
+            }
+        }
+        Message::InstallProject(i) => {
+            if let Some(project) = state.projects.get_mut(i) {
+                assert!(!project.is_installed);
+
+                project.status = ProjectStatus::Installing;
+                return Task::perform(
+                    install_project(project.id.clone(), project.repo.clone()),
+                    move |_| Message::ProjectSynced(i, SyncAction::Ignore),
+                );
+            }
+        }
+        Message::UninstallProject(i) => {
+            if let Some(project) = state.projects.get_mut(i) {
+                assert!(project.is_installed);
+
+                project.status = ProjectStatus::Uninstalling;
+                return Task::perform(
+                    uninstall_project(project.id.clone()),
+                    move |_| Message::ProjectUninstalled(i),
+                );
+            }
+        }
+        Message::ProjectUninstalled(i) => {
+            if let Some(project) = state.projects.get_mut(i) {
+                assert!(project.status == ProjectStatus::Uninstalling);
+
+                project.is_installed = false;
+                project.status = ProjectStatus::Idle;
             }
         }
     }
@@ -226,38 +271,41 @@ fn subscription(_state: &State) -> Subscription<Message> {
 }
 
 fn project_card(index: usize, project: &Project) -> Element<'_, Message> {
+    const CARD_WIDTH: f32 = 400.0;
     let preview = image(project.preview.clone())
-        .width(Length::Fixed(280.0))
-        .height(Length::Fixed(157.5))
+        .width(Length::Fixed(CARD_WIDTH))
+        .height(Length::Fixed(CARD_WIDTH / 16.0 * 9.0))
         .content_fit(ContentFit::Cover);
 
     let status_color = match project.status {
         ProjectStatus::Idle => Color::from_rgb8(140, 140, 140),
         ProjectStatus::Installing => Color::from_rgb8(70, 130, 180),
         ProjectStatus::Running => Color::from_rgb8(59, 109, 17),
+        ProjectStatus::Uninstalling => Color::from_rgb8(192, 57, 43),
     };
 
     let status_label = text(match project.status {
         ProjectStatus::Idle => "● Idle",
         ProjectStatus::Installing => "● Installing",
         ProjectStatus::Running => "● Running",
+        ProjectStatus::Uninstalling => "● Uninstalling",
     })
     .size(12)
     .color(status_color);
 
-    let cached_color = if project.is_installed {
+    let installed_color = if project.is_installed {
         Color::from_rgb8(59, 109, 17)
     } else {
         Color::from_rgb8(140, 140, 140)
     };
 
-    let cached_label = text(if project.is_installed {
+    let installed_label = text(if project.is_installed {
         "● Installed"
     } else {
         "● Not installed"
     })
     .size(12)
-    .color(cached_color);
+    .color(installed_color);
 
     let action_btn: Element<Message> = {
         let (label, on_press) = match project.status {
@@ -268,10 +316,44 @@ fn project_card(index: usize, project: &Project) -> Element<'_, Message> {
             ProjectStatus::Running => {
                 ("■  Stop", Some(Message::StopProject(index)))
             }
+            ProjectStatus::Uninstalling => ("↺  Uninstalling", None),
         };
         let btn = button(text(label).size(13))
             .padding([7, 16])
-            .width(Length::Fill);
+            .width(Length::FillPortion(2));
+
+        if let Some(on_press) = on_press {
+            btn.on_press(on_press)
+        } else {
+            btn
+        }
+        .into()
+    };
+
+    let installation_btn: Element<Message> = {
+        let (label, on_press, is_destructive) =
+            match (project.is_installed, project.status == ProjectStatus::Idle)
+            {
+                (true, true) => (
+                    "✖  Uninstall",
+                    Some(Message::UninstallProject(index)),
+                    true,
+                ),
+                (true, false) => ("✖  Uninstall", None, true),
+                (false, true) => {
+                    ("↓  Install", Some(Message::InstallProject(index)), false)
+                }
+                (false, false) => ("↓  Install", None, false),
+            };
+
+        let btn = button(text(label).size(13))
+            .style(if is_destructive {
+                button::danger
+            } else {
+                button::primary
+            })
+            .padding([7, 16])
+            .width(Length::FillPortion(1));
 
         if let Some(on_press) = on_press {
             btn.on_press(on_press)
@@ -284,13 +366,13 @@ fn project_card(index: usize, project: &Project) -> Element<'_, Message> {
     let info = column![
         column![text(&project.name).size(14), text(&project.owner).size(11)]
             .spacing(3),
-        row![status_label, cached_label].spacing(3),
-        action_btn
+        row![status_label, installed_label].spacing(3),
+        row![action_btn, installation_btn].spacing(8)
     ]
     .spacing(10)
     .padding(Padding::from(14).left(10));
 
-    let card_body = column![preview, info].width(Length::Fixed(280.0));
+    let card_body = column![preview, info].width(Length::Fixed(CARD_WIDTH));
 
     container(card_body)
         .style(|theme: &Theme| {
@@ -326,6 +408,13 @@ async fn install_project(id: String, repo: String) {
             .status();
     })
     .await;
+}
+
+async fn uninstall_project(id: String) {
+    let target_dir = get_cache_dir().join(&id);
+    assert!(target_dir.exists());
+
+    let _ = tokio::fs::remove_dir_all(target_dir).await;
 }
 
 fn launch_project(project: &mut Project) {

@@ -22,7 +22,7 @@ jobs:
             bin: project-catalog
 
           - os: windows-latest
-            name: project-catalog-windows
+            name: project-catalog-windows.exe
             bin: project-catalog.exe
 
     runs-on: ${{ matrix.os }}

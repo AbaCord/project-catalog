@@ -330,7 +330,8 @@ async fn install_project(id: String, repo: String) {
 
 fn launch_project(project: &mut Project) {
     let pom_path = get_cache_dir().join(&project.id).join("pom.xml");
-    let mut command = CommandWrap::with_new("mvn", |command| {
+    let program = if cfg!(windows) { "mvn.cmd" } else { "mvn" };
+    let mut command = CommandWrap::with_new(program, |command| {
         command
             .arg("-f")
             .arg(pom_path)
@@ -346,7 +347,7 @@ fn launch_project(project: &mut Project) {
     }
     #[cfg(windows)]
     {
-        use process_wrap::windows::JobObject;
+        use process_wrap::std::JobObject;
         command.wrap(JobObject);
     }
 

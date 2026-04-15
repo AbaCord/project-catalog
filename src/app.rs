@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{str::Bytes, time::Duration};
 
 use iced::{
     Border, Color, ContentFit, Element, Length, Padding, Subscription, Task,
@@ -44,14 +44,14 @@ impl App {
     pub fn new() -> Self {
         let cached_projects = get_cached_projects();
 
-        let make = |name: &str, owner: &str, repo: &str, path: &str| {
+        let make = |name: &str, owner: &str, repo: &str, image: &[u8]| {
             let id = name.to_kebab_case();
             Project::new(
                 &id,
                 name,
                 owner,
                 repo,
-                image::Handle::from_path(path),
+                image::Handle::from_bytes(image.to_vec()),
                 cached_projects.contains(&id),
             )
         };
@@ -61,7 +61,9 @@ impl App {
                 "Pokemon battle simulator",
                 "Nikolai Ciric",
                 "https://github.com/nikcir/Java-Pokemon-battle-simulator",
-                "assets/previews/pokemon-battle-simulator.png",
+                include_bytes!(
+                    "../assets/previews/pokemon-battle-simulator.png"
+                ),
             )],
         }
     }

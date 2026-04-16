@@ -1,10 +1,12 @@
-use std::{str::Bytes, time::Duration};
+use std::{path::PathBuf, process::Command, time::Duration};
 
 use iced::{
     Border, Color, ContentFit, Element, Length, Padding, Subscription, Task,
-    Theme, time,
+    Theme,
+    alignment::Vertical,
+    time,
     widget::{
-        Row, button, column, container, image, row, scrollable, text,
+        Row, button, column, container, image, row, scrollable, space, text,
         text_input,
     },
 };
@@ -13,6 +15,9 @@ use crate::{
     projects::{
         Project, ProjectStatus, get_cached_projects, install_project,
         launch_project, uninstall_project,
+    },
+    update::{
+        Error, Progress, download_stream, fetch_latest_release, replace_binary,
     },
     utils::ToKebabCase,
 };
@@ -33,15 +38,31 @@ pub enum Message {
     InstallProject(usize),
     UninstallProject(usize),
     ProjectUninstalled(usize),
+    ReleaseFetched(Option<(String, String)>),
+    StartUpdate,
+    DownloadProgress(Progress),
+    DownloadComplete(Result<PathBuf, Error>),
+    DismissUpdate,
+    Restart,
+}
+
+pub enum UpdateState {
+    UpToDate,
+    Available { version: String, url: String },
+    Downloading { version: String, progress: f32 },
+    Restarting,
 }
 
 pub struct App {
     projects: Vec<Project>,
     search: String,
+    update: UpdateState,
+    current_version: String,
+    exe_path: PathBuf,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new() -> (Self, Task<Message>) {
         let cached_projects = get_cached_projects();
 
         let make = |name: &str, owner: &str, repo: &str, image: &[u8]| {
@@ -55,17 +76,23 @@ impl App {
                 cached_projects.contains(&id),
             )
         };
-        Self {
-            search: String::new(),
-            projects: vec![make(
-                "Pokemon battle simulator",
-                "Nikolai Ciric",
-                "https://github.com/nikcir/Java-Pokemon-battle-simulator",
-                include_bytes!(
-                    "../assets/previews/pokemon-battle-simulator.png"
-                ),
-            )],
-        }
+        (
+            Self {
+                search: String::new(),
+                projects: vec![make(
+                    "Pokemon battle simulator",
+                    "Nikolai Ciric",
+                    "https://github.com/nikcir/Java-Pokemon-battle-simulator",
+                    include_bytes!(
+                        "../assets/previews/pokemon-battle-simulator.png"
+                    ),
+                )],
+                update: UpdateState::UpToDate,
+                current_version: env!("CARGO_PKG_VERSION").to_string(),
+                exe_path: std::env::current_exe().unwrap(),
+            },
+            Task::perform(fetch_latest_release(), Message::ReleaseFetched),
+        )
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -152,17 +179,63 @@ impl App {
                     project.status = ProjectStatus::Idle;
                 }
             }
+            Message::ReleaseFetched(release) => {
+                if let Some((version, url)) = release {
+                    let version =
+                        version.strip_prefix('v').unwrap().to_string();
+                    if version != self.current_version {
+                        self.update = UpdateState::Available { version, url }
+                    }
+                }
+            }
+            Message::StartUpdate => {
+                if let UpdateState::Available { version, url } = &self.update {
+                    let url = url.clone();
+                    self.update = UpdateState::Downloading {
+                        version: version.clone(),
+                        progress: 0.0,
+                    };
+                    return Task::sip(
+                        download_stream(url),
+                        Message::DownloadProgress,
+                        Message::DownloadComplete,
+                    );
+                }
+            }
+            Message::DownloadProgress(progress) => {
+                if let UpdateState::Downloading { version, .. } = &self.update {
+                    self.update = UpdateState::Downloading {
+                        version: version.clone(),
+                        progress: progress.percent,
+                    }
+                }
+            }
+            Message::DownloadComplete(result) => {
+                if let Ok(path) = result {
+                    self.update = UpdateState::Restarting;
+                    return Task::perform(replace_binary(path.clone()), |_| {
+                        Message::Restart
+                    });
+                } else {
+                    // TODO: handle error
+                    self.update = UpdateState::UpToDate;
+                }
+            }
+            Message::DismissUpdate => {
+                self.update = UpdateState::UpToDate;
+            }
+            Message::Restart => {
+                let _ = Command::new(&self.exe_path).spawn();
+                std::process::exit(0);
+            }
         }
 
         Task::none()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let header = column![
-            text("Project catalog").size(22),
-            text("Abacord JavaFx projects").size(14)
-        ]
-        .spacing(4);
+        let header = self.view_header();
+        let update_banner = self.view_update_banner();
 
         let search_bar = text_input("Search projects...", &self.search)
             .on_input(Message::SearchChanged)
@@ -170,7 +243,6 @@ impl App {
             .width(Length::Fill);
 
         let query = self.search.to_lowercase();
-
         let cards: Vec<_> = self
             .projects
             .iter()
@@ -188,12 +260,101 @@ impl App {
             Row::with_children(cards).spacing(14).wrap().into()
         };
 
-        let content = column![header, search_bar, body]
-            .spacing(20)
-            .padding(24)
-            .width(Length::Fill);
+        let scroll = scrollable(column![search_bar, body].spacing(16))
+            .height(Length::Fill);
 
-        scrollable(content).height(Length::Fill).into()
+        let mut layout = column![header];
+        if let Some(banner) = update_banner {
+            layout = layout.push(banner);
+        }
+        layout.push(scroll).padding(20).spacing(18).into()
+    }
+
+    fn view_header(&self) -> Element<'_, Message> {
+        let titles = column![
+            text("Project catalog").size(22),
+            text("AbaCord JavaFX projects").size(14)
+        ]
+        .spacing(4)
+        .width(Length::Fill);
+
+        let version = text!("v{}", self.current_version)
+            .size(12)
+            .color([0.5, 0.5, 0.5, 1.0]);
+
+        container(row![titles, version].align_y(Vertical::Center))
+            .width(Length::Fill)
+            .style(|theme: &Theme| {
+                let palette = theme.extended_palette();
+                container::Style {
+                    border: Border {
+                        color: palette.background.strong.color,
+                        width: 0.0,
+                        ..Default::default()
+                    },
+                    background: Some(palette.background.base.color.into()),
+                    ..Default::default()
+                }
+            })
+            .into()
+    }
+
+    fn view_update_banner(&self) -> Option<Element<'_, Message>> {
+        match &self.update {
+            UpdateState::UpToDate => None,
+            UpdateState::Available { version, .. } => {
+                let label = text!("v{version} is available").size(12);
+                let dl_btn = button(text("Download & restart").size(12))
+                    .on_press(Message::StartUpdate)
+                    .padding([4, 12]);
+                let dismiss_btn = button(text("✕").size(12))
+                    .on_press(Message::DismissUpdate)
+                    .padding([4, 8]);
+                let inner =
+                    row![label, space::horizontal(), dl_btn, dismiss_btn]
+                        .spacing(8)
+                        .align_y(Vertical::Center)
+                        .width(Length::Fill);
+                Some(
+                    container(inner)
+                        .padding([8, 16])
+                        .height(Length::Fixed(36.0))
+                        .width(Length::Fill)
+                        .style(banner_style)
+                        .into(),
+                )
+            }
+            UpdateState::Downloading { version, .. } => {
+                let label = text!("Downloading v{version}...").size(12);
+                let inner = row![label]
+                    .align_y(Vertical::Center)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding([0, 8]);
+                Some(
+                    container(inner)
+                        .height(Length::Fixed(36.0))
+                        .width(Length::Fill)
+                        .style(banner_style)
+                        .into(),
+                )
+            }
+            UpdateState::Restarting => {
+                let label = text("Restarting...").size(12);
+                let inner = row![label]
+                    .align_y(Vertical::Center)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding([0, 8]);
+                Some(
+                    container(inner)
+                        .height(Length::Fixed(36.0))
+                        .width(Length::Fill)
+                        .style(banner_style)
+                        .into(),
+                )
+            }
+        }
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -323,4 +484,18 @@ fn project_card(index: usize, project: &Project) -> Element<'_, Message> {
             }
         })
         .into()
+}
+
+fn banner_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+
+    container::Style {
+        background: Some(palette.background.into()),
+        border: Border {
+            color: palette.primary.into(),
+            width: 1.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
 }

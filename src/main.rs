@@ -1,5 +1,6 @@
 mod app;
 mod projects;
+mod update;
 mod utils;
 
 use crate::app::App;

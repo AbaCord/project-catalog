@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{path::PathBuf, process::Command, time::Duration};
 
 use iced::{
     Border, Color, ContentFit, Element, Length, Padding, Subscription, Task,
@@ -15,6 +15,9 @@ use crate::{
     projects::{
         Project, ProjectStatus, get_cached_projects, install_project,
         launch_project, uninstall_project,
+    },
+    update::{
+        Error, Progress, download_stream, fetch_latest_release, replace_binary,
     },
     utils::ToKebabCase,
 };
@@ -35,16 +38,17 @@ pub enum Message {
     InstallProject(usize),
     UninstallProject(usize),
     ProjectUninstalled(usize),
-    UpdateAvailable(String),
+    ReleaseFetched(Option<(String, String)>),
     StartUpdate,
-    DownloadProgress(f32),
-    DownloadComplete,
+    DownloadProgress(Progress),
+    DownloadComplete(Result<PathBuf, Error>),
     DismissUpdate,
+    Restart,
 }
 
 pub enum UpdateState {
     UpToDate,
-    Available { version: String },
+    Available { version: String, url: String },
     Downloading { version: String, progress: f32 },
     Restarting,
 }
@@ -54,10 +58,11 @@ pub struct App {
     search: String,
     update: UpdateState,
     current_version: String,
+    exe_path: PathBuf,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new() -> (Self, Task<Message>) {
         let cached_projects = get_cached_projects();
 
         let make = |name: &str, owner: &str, repo: &str, image: &[u8]| {
@@ -71,19 +76,23 @@ impl App {
                 cached_projects.contains(&id),
             )
         };
-        Self {
-            search: String::new(),
-            projects: vec![make(
-                "Pokemon battle simulator",
-                "Nikolai Ciric",
-                "https://github.com/nikcir/Java-Pokemon-battle-simulator",
-                include_bytes!(
-                    "../assets/previews/pokemon-battle-simulator.png"
-                ),
-            )],
-            update: UpdateState::UpToDate,
-            current_version: env!("CARGO_PKG_VERSION").to_string(),
-        }
+        (
+            Self {
+                search: String::new(),
+                projects: vec![make(
+                    "Pokemon battle simulator",
+                    "Nikolai Ciric",
+                    "https://github.com/nikcir/Java-Pokemon-battle-simulator",
+                    include_bytes!(
+                        "../assets/previews/pokemon-battle-simulator.png"
+                    ),
+                )],
+                update: UpdateState::UpToDate,
+                current_version: env!("CARGO_PKG_VERSION").to_string(),
+                exe_path: std::env::current_exe().unwrap(),
+            },
+            Task::perform(fetch_latest_release(), Message::ReleaseFetched),
+        )
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -170,30 +179,54 @@ impl App {
                     project.status = ProjectStatus::Idle;
                 }
             }
-            Message::UpdateAvailable(version) => {
-                self.update = UpdateState::Available { version }
+            Message::ReleaseFetched(release) => {
+                if let Some((version, url)) = release {
+                    let version =
+                        version.strip_prefix('v').unwrap().to_string();
+                    if version != self.current_version {
+                        self.update = UpdateState::Available { version, url }
+                    }
+                }
             }
             Message::StartUpdate => {
-                if let UpdateState::Available { version } = &self.update {
+                if let UpdateState::Available { version, url } = &self.update {
+                    let url = url.clone();
                     self.update = UpdateState::Downloading {
                         version: version.clone(),
                         progress: 0.0,
                     };
+                    return Task::sip(
+                        download_stream(url),
+                        Message::DownloadProgress,
+                        Message::DownloadComplete,
+                    );
                 }
             }
-            Message::DownloadProgress(p) => {
+            Message::DownloadProgress(progress) => {
                 if let UpdateState::Downloading { version, .. } = &self.update {
                     self.update = UpdateState::Downloading {
                         version: version.clone(),
-                        progress: p,
+                        progress: progress.percent,
                     }
                 }
             }
-            Message::DownloadComplete => {
-                self.update = UpdateState::Restarting;
+            Message::DownloadComplete(result) => {
+                if let Ok(path) = result {
+                    self.update = UpdateState::Restarting;
+                    return Task::perform(replace_binary(path.clone()), |_| {
+                        Message::Restart
+                    });
+                } else {
+                    // TODO: handle error
+                    self.update = UpdateState::UpToDate;
+                }
             }
             Message::DismissUpdate => {
                 self.update = UpdateState::UpToDate;
+            }
+            Message::Restart => {
+                let _ = Command::new(&self.exe_path).spawn();
+                std::process::exit(0);
             }
         }
 
@@ -269,7 +302,7 @@ impl App {
     fn view_update_banner(&self) -> Option<Element<'_, Message>> {
         match &self.update {
             UpdateState::UpToDate => None,
-            UpdateState::Available { version } => {
+            UpdateState::Available { version, .. } => {
                 let label = text!("v{version} is available").size(12);
                 let dl_btn = button(text("Download & restart").size(12))
                     .on_press(Message::StartUpdate)

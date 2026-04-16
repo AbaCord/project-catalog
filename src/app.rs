@@ -96,6 +96,12 @@ impl App {
                     "https://github.com/acowo/speezy",
                     include_bytes!("../assets/previews/speezy.png"),
                 ),
+                make(
+                    "Straffespark",
+                    "Julie Wold",
+                    "https://github.com/juliewold/fotballstraffespill",
+                    include_bytes!("../assets/previews/straffespark.png"),
+                ),
             ],
         }
     }

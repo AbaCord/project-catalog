@@ -84,6 +84,12 @@ impl App {
                     "https://github.com/ayskarsaune/tdt4100-prosjekt",
                     include_bytes!("../assets/previews/attendance.png"),
                 ),
+                make(
+                    "Chess",
+                    "Sander Kjeøy",
+                    "https://github.com/SnadderCode/tdt4100-prosjekt-sjakk",
+                    include_bytes!("../assets/previews/chess.png"),
+                ),
             ],
         }
     }

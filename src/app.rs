@@ -78,6 +78,12 @@ impl App {
                     "https://github.com/Svela002/Piano-Quiz",
                     include_bytes!("../assets/previews/piano-quiz.png"),
                 ),
+                make(
+                    "Attendance",
+                    "Angelica Yen Skarsaune",
+                    "https://github.com/ayskarsaune/tdt4100-prosjekt",
+                    include_bytes!("../assets/previews/attendance.png"),
+                ),
             ],
         }
     }

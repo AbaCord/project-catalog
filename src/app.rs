@@ -102,6 +102,12 @@ impl App {
                     "https://github.com/juliewold/fotballstraffespill",
                     include_bytes!("../assets/previews/straffespark.png"),
                 ),
+                make(
+                    "Sudoku",
+                    "Tony Ngo",
+                    "https://github.com/TonyWorep/tdt4100-prosjekt",
+                    include_bytes!("../assets/previews/sudoku.png"),
+                ),
             ],
         }
     }

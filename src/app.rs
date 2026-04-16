@@ -90,6 +90,12 @@ impl App {
                     "https://github.com/SnadderCode/tdt4100-prosjekt-sjakk",
                     include_bytes!("../assets/previews/chess.png"),
                 ),
+                make(
+                    "Speezy",
+                    "Oliver Naper",
+                    "https://github.com/acowo/speezy",
+                    include_bytes!("../assets/previews/speezy.png"),
+                ),
             ],
         }
     }

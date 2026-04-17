@@ -136,6 +136,12 @@ impl App {
                         "https://git.ntnu.no/niklahat/Battleship",
                         include_bytes!("../assets/previews/battleship.png"),
                     ),
+                    make(
+                        "NumbersQuiz",
+                        "Jorunn Elisabeth Tjore",
+                        "https://git.ntnu.no/jorunnet/NumbersQuiz",
+                        include_bytes!("../assets/previews/numbersquiz.png"),
+                    ),
                 ],
                 update: UpdateState::UpToDate,
                 current_version: env!("CARGO_PKG_VERSION").to_string(),

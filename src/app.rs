@@ -79,14 +79,64 @@ impl App {
         (
             Self {
                 search: String::new(),
-                projects: vec![make(
-                    "Pokemon battle simulator",
-                    "Nikolai Ciric",
-                    "https://github.com/nikcir/Java-Pokemon-battle-simulator",
-                    include_bytes!(
-                        "../assets/previews/pokemon-battle-simulator.png"
+                projects: vec![
+                    make(
+                        "Pokemon battle simulator",
+                        "Nikolai Ciric",
+                        "https://github.com/nikcir/Java-Pokemon-battle-simulator",
+                        include_bytes!(
+                            "../assets/previews/pokemon-battle-simulator.png"
+                        ),
                     ),
-                )],
+                    make(
+                        "PacMan",
+                        "Kristoffer Nergaard",
+                        "https://github.com/Superkriss0911/PacMan",
+                        include_bytes!("../assets/previews/pacman.png"),
+                    ),
+                    make(
+                        "Piano Quiz",
+                        "Sven Elden",
+                        "https://github.com/Svela002/Piano-Quiz",
+                        include_bytes!("../assets/previews/piano-quiz.png"),
+                    ),
+                    make(
+                        "Attendance",
+                        "Angelica Yen Skarsaune",
+                        "https://github.com/ayskarsaune/tdt4100-prosjekt",
+                        include_bytes!("../assets/previews/attendance.png"),
+                    ),
+                    make(
+                        "Chess",
+                        "Sander Kjeøy",
+                        "https://github.com/SnadderCode/tdt4100-prosjekt-sjakk",
+                        include_bytes!("../assets/previews/chess.png"),
+                    ),
+                    make(
+                        "Speezy",
+                        "Oliver Naper",
+                        "https://github.com/acowo/speezy",
+                        include_bytes!("../assets/previews/speezy.png"),
+                    ),
+                    make(
+                        "Straffespark",
+                        "Julie Wold",
+                        "https://github.com/juliewold/fotballstraffespill",
+                        include_bytes!("../assets/previews/straffespark.png"),
+                    ),
+                    make(
+                        "Sudoku",
+                        "Tony Ngo",
+                        "https://github.com/TonyWorep/tdt4100-prosjekt",
+                        include_bytes!("../assets/previews/sudoku.png"),
+                    ),
+                    make(
+                        "Battleship",
+                        "Niklas Hattestad",
+                        "https://git.ntnu.no/niklahat/Battleship",
+                        include_bytes!("../assets/previews/battleship.png"),
+                    ),
+                ],
                 update: UpdateState::UpToDate,
                 current_version: env!("CARGO_PKG_VERSION").to_string(),
                 exe_path: std::env::current_exe().unwrap(),

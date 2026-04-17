@@ -130,6 +130,12 @@ impl App {
                         "https://github.com/TonyWorep/tdt4100-prosjekt",
                         include_bytes!("../assets/previews/sudoku.png"),
                     ),
+                    make(
+                        "Battleship",
+                        "Niklas Hattestad",
+                        "https://git.ntnu.no/niklahat/Battleship",
+                        include_bytes!("../assets/previews/battleship.png"),
+                    ),
                 ],
                 update: UpdateState::UpToDate,
                 current_version: env!("CARGO_PKG_VERSION").to_string(),

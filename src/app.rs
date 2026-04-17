@@ -142,6 +142,12 @@ impl App {
                         "https://git.ntnu.no/jorunnet/NumbersQuiz",
                         include_bytes!("../assets/previews/numbersquiz.png"),
                     ),
+                    make(
+                        "Music Game",
+                        "Don Vo",
+                        "https://github.com/PixelRush/Music-Game-pv",
+                        include_bytes!("../assets/previews/music-game.png"),
+                    ),
                 ],
                 update: UpdateState::UpToDate,
                 current_version: env!("CARGO_PKG_VERSION").to_string(),

@@ -42,8 +42,8 @@ Make sure you have installed:
 
 #### Steps
 
-1. Go to the _Releases_ section of this repository
-2. Download the latest executable for your platform
+1. Go to the [Latest Release](https://github.com/AbaCord/project-catalog/releases/latest)
+2. Download the executable for your platform
 3. Run it. Windows probably gives a warning about the executable, but you can trust it ;)
 
 ## How It Works

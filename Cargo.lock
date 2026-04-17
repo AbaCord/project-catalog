@@ -3323,7 +3323,7 @@ dependencies = [
 
 [[package]]
 name = "project-catalog"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "dirs",
  "iced",

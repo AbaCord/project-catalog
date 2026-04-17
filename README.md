@@ -32,8 +32,18 @@ cargo run
 
 ### Option 2: Download executable
 
-1. Go to the _Releases_ section of this repository
-2. Download the latest executable for your platform
+#### Prerequisites
+
+Make sure you have installed:
+
+- [Git](https://git-scm.com)
+- [Java](https://www.oracle.com/java)
+- [Maven](https://maven.apache.org)
+
+#### Steps
+
+1. Go to the [Latest Release](https://github.com/AbaCord/project-catalog/releases/latest)
+2. Download the executable for your platform
 3. Run it. Windows probably gives a warning about the executable, but you can trust it ;)
 
 ## How It Works
